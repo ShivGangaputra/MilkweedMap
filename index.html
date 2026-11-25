@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Milkweed Patch Map | Shared Habitat Tracker</title>
+
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            meadow: {
+              50: '#f3f9f4',
+              100: '#e2f1e5',
+              200: '#c6e3cc',
+              300: '#9ccda8',
+              400: '#6bb07d',
+              500: '#46925b',
+              600: '#357647',
+              700: '#2b5e3a',
+              800: '#244b30',
+              900: '#1e3e28',
+            },
+            amberleaf: {
+              50: '#fffbeb',
+              100: '#fef3c7',
+              200: '#fde68a',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+              800: '#92400e',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Leaflet CSS & JS (Coordinate Picker & Live Pins Map) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Custom scrollbar and map polish */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f3f9f4;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #9ccda8;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #46925b;
+    }
+    .leaflet-container {
+      font-family: 'Inter', sans-serif !important;
+      z-index: 10;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 1rem !important;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+      padding: 4px !important;
+    }
+    .leaflet-popup-content {
+      margin: 10px 12px !important;
+      line-height: 1.45 !important;
+    }
+    .custom-pin {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s ease;
+    }
+    .custom-pin:hover {
+      transform: scale(1.15);
+    }
+    @keyframes pulseRing {
+      0% { transform: scale(0.8); opacity: 0.8; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    .pin-pulse {
+      animation: pulseRing 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+  </style>
+</head>
+<body class="bg-meadow-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-white/95 backdrop-blur-md border-b border-meadow-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand Logo & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-meadow-600 to-meadow-800 flex items-center justify-center text-white shadow-md">
+          <!-- Custom SVG Milkweed Emblem -->
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22V8" />
+            <path d="M12 15c-4 0-7-2.8-7-6.5 4 0 7 2.8 7 6.5Z" fill="#9ccda8" fill-opacity="0.45" />
+            <path d="M12 12c4 0 7-2.8 7-6.5-4 0-7 2.8-7 6.5Z" fill="#9ccda8" fill-opacity="0.45" />
+            <circle cx="12" cy="5" r="2" fill="#fde68a" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="font-display font-bold text-lg sm:text-xl text-meadow-900 leading-tight flex items-center gap-2">
+            Milkweed Patch Map
+            <span id="header-sync-badge" class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-meadow-100 text-meadow-800 border border-meadow-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Connecting...
+            </span>
+          </h1>
+          <p class="text-xs text-slate-500">Shared Milkweed Patch Map</p>
+        </div>
+      </div>
+
+      <!-- Summary Counters & Action Buttons -->
+      <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
+        <!-- Live Stats Pills -->
+        <div class="hidden xl:flex items-center gap-2 bg-meadow-50 border border-meadow-200 rounded-xl px-3 py-1.5">
+          <div class="flex items-center gap-1.5 pr-2.5 border-r border-meadow-200">
+            <span class="w-2.5 h-2.5 rounded-full bg-meadow-600"></span>
+            <span class="text-xs font-medium text-slate-600">Patches:</span>
+            <span id="stat-total-patches" class="text-sm font-bold text-meadow-900">0</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-medium text-slate-600">Est. Plants:</span>
+            <span id="stat-total-plants" class="text-sm font-bold text-meadow-700">0</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Main Workspace Layout -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+    <!-- Left Column: Shared interactive map (7 cols on lg) -->
+    <section class="lg:col-span-7 flex flex-col gap-4">
+      <!-- Map Card -->
+      <div class="bg-white rounded-2xl border border-meadow-200 shadow-sm overflow-hidden flex flex-col">
+        <!-- Map Toolbar -->
+        <div class="px-4 py-3 bg-white border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+          
+
+          <!-- Context Controls (Basemap & GPS) -->
+          <div class="flex items-center gap-2">
+            <select id="map-basemap-select" aria-label="Map style" class="hidden text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-meadow-500">
+              <option value="osm">Street & Trail</option>
+              <option value="topo">Topographic</option>
+              <option value="satellite">Satellite</option>
+            </select>
+
+            <button id="btn-locate-me" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-meadow-600 hover:bg-meadow-700 text-white transition shadow-2xs">
+              <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+              <span>Use My GPS</span>
+            </button>
+          </div>
+        </div>
+
+
+        <!-- Map Viewport Wrapper -->
+        <div class="relative w-full h-[430px] sm:h-[520px] bg-meadow-100">
+
+          <!-- Secondary Interactive Leaflet Coordinate Picker & Live Pins Container -->
+          <div id="leaflet-map" class="w-full h-full"></div>
+
+          <!-- Map Legend Overlay (Shown when Live map view is active) -->
+          <div id="map-legend" class="absolute bottom-3 left-3 z-20 bg-white/95 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-200 shadow-md text-xs flex flex-col gap-1.5 pointer-events-auto">
+            <div class="font-semibold text-slate-700 text-[11px] uppercase tracking-wider">Pin Legend</div>
+            <div class="flex items-center gap-2">
+              <span class="w-3.5 h-3.5 rounded-full bg-meadow-600 border-2 border-white shadow-2xs inline-block"></span>
+              <span class="text-slate-700">Saved Milkweed Patch</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-3.5 h-3.5 rounded-full bg-sky-500 border-2 border-white shadow-2xs inline-block"></span>
+              <span class="text-slate-700">Selected Pin Location</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile Stats Banner -->
+      <div class="grid grid-cols-2 gap-2.5 xl:hidden">
+        <div class="bg-white p-3 rounded-2xl border border-meadow-200 text-center shadow-2xs">
+          <div class="text-xs text-slate-500 font-medium">Logged Milkweed Patches</div>
+          <div id="mobile-stat-patches" class="text-lg font-bold text-meadow-800 mt-0.5">0</div>
+        </div>
+        <div class="bg-white p-3 rounded-2xl border border-meadow-200 text-center shadow-2xs">
+          <div class="text-xs text-slate-500 font-medium">Estimated Total Plants</div>
+          <div id="mobile-stat-plants" class="text-lg font-bold text-meadow-700 mt-0.5">0</div>
+        </div>
+      </div>
+
+      <!-- Sync & Firebase Status Footer Card -->
+      <div class="bg-gradient-to-r from-meadow-800 to-meadow-900 text-white rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-start gap-3">
+          <div class="p-2 rounded-xl bg-white/10 text-meadow-200 shrink-0 mt-0.5">
+            <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-display font-bold text-sm text-white">Shared Milkweed Map</h3>
+            <p class="text-xs text-meadow-100 mt-0.5 leading-relaxed">
+              Sightings submitted by visitors appear here for everyone in real time.
+            </p>
+          </div>
+        </div>
+        <div class="text-[11px] bg-white/10 px-2.5 py-1.5 rounded-xl text-meadow-100 shrink-0">
+          Public shared map · Live updates
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Sighting Form (with Optional Photo) & Filterable Directory (5 cols on lg) -->
+    <section class="lg:col-span-5 flex flex-col gap-5">
+
+      <!-- Public Sighting Submission Form Card -->
+      <div id="form-card" class="bg-white rounded-2xl border border-meadow-200 shadow-sm p-4 sm:p-5">
+        <div class="flex items-center justify-between mb-3.5">
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 rounded-xl bg-meadow-100 text-meadow-700 flex items-center justify-center">
+              <i data-lucide="sprout" class="w-4 h-4"></i>
+            </span>
+            <div>
+              <h2 id="form-heading" class="font-display font-bold text-base text-slate-900">Log a Milkweed Sighting</h2>
+              <p id="form-subheading" class="text-xs text-slate-500">Use GPS, type coordinates, or click the Coordinate Picker map</p>
+            </div>
+          </div>
+
+        </div>
+
+        <form id="sighting-form" class="space-y-3.5">
+
+          <!-- Coordinates Row -->
+          <div class="grid grid-cols-2 gap-2.5 bg-meadow-50/70 p-2.5 rounded-xl border border-meadow-200/80">
+            <div>
+              <label for="input-lat" class="block text-[11px] font-semibold uppercase tracking-wider text-meadow-800 mb-1">Latitude *</label>
+              <input type="number" step="any" id="input-lat" required placeholder="e.g. 42.3318" class="w-full px-2.5 py-1.5 text-sm bg-white border border-meadow-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-meadow-500 font-mono" />
+            </div>
+            <div>
+              <label for="input-lng" class="block text-[11px] font-semibold uppercase tracking-wider text-meadow-800 mb-1">Longitude *</label>
+              <input type="number" step="any" id="input-lng" required placeholder="e.g. -71.1212" class="w-full px-2.5 py-1.5 text-sm bg-white border border-meadow-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-meadow-500 font-mono" />
+            </div>
+          </div>
+
+          <!-- Location Name / Landmark -->
+          <div>
+            <label for="input-location-name" class="block text-xs font-semibold text-slate-700 mb-1">Location Name / Landmark *</label>
+            <input type="text" id="input-location-name" required maxlength="80" placeholder="e.g. Sunny meadow edge near Cedar Trail" class="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-meadow-500" />
+          </div>
+
+          <!-- Species & Patch Size Row -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label for="input-species" class="block text-xs font-semibold text-slate-700 mb-1">Milkweed Species *</label>
+              <select id="input-species" required class="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-meadow-500">
+                <option value="Common Milkweed">Common Milkweed (A. syriaca)</option>
+                <option value="Butterfly Weed">Butterfly Weed (A. tuberosa)</option>
+                <option value="Swamp Milkweed">Swamp Milkweed (A. incarnata)</option>
+                <option value="Showy Milkweed">Showy Milkweed (A. speciosa)</option>
+                <option value="Whorled Milkweed">Whorled Milkweed (A. verticillata)</option>
+                <option value="Narrowleaf Milkweed">Narrowleaf Milkweed (A. fascicularis)</option>
+                <option value="Other / Unsure">Other / Unsure</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="input-patch-size" class="block text-xs font-semibold text-slate-700 mb-1">Patch Size / Plant Count *</label>
+              <select id="input-patch-size" required class="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-meadow-500">
+                <option value="Small (1–5 plants)">Small (1–5 plants)</option>
+                <option value="Medium (6–20 plants)" selected>Medium (6–20 plants)</option>
+                <option value="Large (21–50 plants)">Large (21–50 plants)</option>
+                <option value="Meadow Colony (50+ plants)">Meadow Colony (50+ plants)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Date Found -->
+          <div>
+            <label for="input-date" class="block text-xs font-semibold text-slate-700 mb-1">Date Found *</label>
+            <input type="date" id="input-date" required class="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-meadow-500" />
+          </div>
+
+          <!-- Optional Photo Section (Device Upload + Image URL) -->
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <i data-lucide="camera" class="w-3.5 h-3.5 text-meadow-600"></i>
+                Photo of Milkweed <span class="text-slate-400 font-normal">(Optional)</span>
+              </span>
+              <button type="button" id="btn-remove-photo" class="hidden text-[11px] font-semibold text-red-600 hover:text-red-700">
+                Remove Photo
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <!-- Upload from Device -->
+              <label for="input-photo-file" class="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-dashed border-meadow-400 bg-white hover:bg-meadow-50 text-xs font-semibold text-meadow-800 cursor-pointer transition">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                <span>Upload Image</span>
+                <input type="file" id="input-photo-file" accept="image/*" class="hidden" />
+              </label>
+
+              <!-- Or Paste Image URL -->
+              <input type="url" id="input-photo-url" placeholder="Or paste image URL..." class="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-meadow-500" />
+            </div>
+
+            <!-- Live Photo Preview -->
+            <div id="photo-preview-wrapper" class="hidden relative rounded-xl overflow-hidden border border-slate-200 bg-white">
+              <img id="photo-preview-img" src="" alt="Milkweed preview" class="w-full h-36 object-cover" />
+            </div>
+          </div>
+
+          <!-- Habitat Notes -->
+          <div>
+            <label for="input-notes" class="block text-xs font-semibold text-slate-700 mb-1">Habitat & Location Notes</label>
+            <textarea id="input-notes" rows="2" maxlength="300" placeholder="Bloom status, seed pods, sun exposure, roadside or trail landmarks..." class="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-meadow-500 resize-none"></textarea>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" id="btn-submit-sighting" class="w-full py-2.5 px-4 rounded-xl font-display font-bold text-sm text-white bg-gradient-to-r from-meadow-600 to-meadow-700 hover:from-meadow-700 hover:to-meadow-800 shadow-sm hover:shadow transition flex items-center justify-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span id="btn-submit-text">Save Milkweed Sighting</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Filterable Community Sightings List Card -->
+      <div class="bg-white rounded-2xl border border-meadow-200 shadow-sm p-4 sm:p-5 flex flex-col flex-1">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h2 class="font-display font-bold text-base text-slate-900 flex items-center gap-2">
+            <span>Logged Milkweed Patches</span>
+            <span id="filtered-count-badge" class="px-2 py-0.5 text-xs font-semibold rounded-full bg-meadow-100 text-meadow-800">0</span>
+          </h2>
+
+          <!-- Quick Photo Filter Pill -->
+          <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-meadow-50 text-meadow-800 border border-meadow-200 cursor-pointer hover:bg-meadow-100 transition select-none">
+            <input type="checkbox" id="filter-photo-only" class="accent-meadow-600 rounded" />
+            <span>📷 With Photos</span>
+          </label>
+        </div>
+
+        <!-- Species & Search Filter Bar -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+          <div class="relative">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="filter-search" placeholder="Search place or notes..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-meadow-500" />
+          </div>
+          <select id="filter-species" aria-label="Filter by species" class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-meadow-500">
+            <option value="ALL">All Milkweed Species</option>
+            <option value="Common Milkweed">Common Milkweed</option>
+            <option value="Butterfly Weed">Butterfly Weed</option>
+            <option value="Swamp Milkweed">Swamp Milkweed</option>
+            <option value="Showy Milkweed">Showy Milkweed</option>
+            <option value="Whorled Milkweed">Whorled Milkweed</option>
+            <option value="Narrowleaf Milkweed">Narrowleaf Milkweed</option>
+            <option value="Other / Unsure">Other / Unsure</option>
+          </select>
+        </div>
+
+        <!-- Sightings Feed Container -->
+        <div id="sightings-list" class="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+          <div class="text-center py-8 text-slate-400 text-sm">
+            Loading milkweed sightings...
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+</div>
+  </div>
+
+  <!-- Full Photo & Details Modal -->
+  <div id="photo-modal" class="hidden fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200">
+      <div class="relative bg-slate-900">
+        <img id="modal-photo-img" src="" alt="Milkweed sighting" class="w-full max-h-[65vh] object-contain mx-auto" />
+        <button id="btn-close-photo-modal" type="button" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="p-4 sm:p-5">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <span id="modal-photo-species" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-meadow-100 text-meadow-800"></span>
+          <span id="modal-photo-date" class="text-xs text-slate-400"></span>
+        </div>
+        <h3 id="modal-photo-title" class="font-display font-bold text-lg text-slate-900"></h3>
+        <p id="modal-photo-size" class="text-xs font-medium text-slate-600 mt-0.5"></p>
+        <p id="modal-photo-notes" class="text-xs text-slate-600 mt-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase & Application Logic -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import {
+      getDatabase,
+      ref,
+      push,
+      set,
+      onValue,
+      serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // =========================================================================
+    // 1. YOUR WEBSITE'S FIXED FIREBASE CONNECTION
+    // =========================================================================
+    // Replace the placeholder values below with the config from YOUR Firebase
+    // project. Visitors cannot change this connection from the website UI.
+    const CUSTOM_FIREBASE_CONFIG = {
+      apiKey: "AIzaSyCLboNS2KZ85Hdbefe0prQftLRaPebPqf0",
+      authDomain: "milkweedmap.firebaseapp.com",
+      databaseURL: "https://milkweedmap-default-rtdb.firebaseio.com",
+      projectId: "milkweedmap",
+      storageBucket: "milkweedmap.firebasestorage.app",
+      messagingSenderId: "72697762842",
+      appId: "1:72697762842:web:5efd58f9be16084cb3ada3",
+      measurementId: "G-CT3M5M6DYP"
+    };
+
+    // All visitors use the same shared path in your Realtime Database.
+
+    let app, db;
+    let allSightings = [];
+    let currentPhotoDataUrl = '';
+
+    // Leaflet Map State
+    let map;
+    let tileLayers = {};
+    let currentTileLayer;
+    let markersLayerGroup;
+    let draftMarker = null;
+
+    // Set default date input to today
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('input-date').value = todayStr;
+
+    // =========================================================================
+    // 2. UI HELPER FUNCTIONS (TOASTS, ESCAPING, STATS)
+    // =========================================================================
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colors = type === 'error'
+        ? 'bg-red-600 text-white border-red-700'
+        : type === 'info'
+          ? 'bg-slate-800 text-white border-slate-700'
+          : 'bg-meadow-800 text-white border-meadow-900';
+
+      toast.className = `${colors} border px-4 py-3 rounded-xl shadow-lg text-xs font-medium flex items-center justify-between gap-3 pointer-events-auto transition-all duration-300 transform translate-y-2 opacity-0`;
+      toast.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+        <button type="button" class="text-white/80 hover:text-white font-bold">&times;</button>
+      `;
+
+      toast.querySelector('button').addEventListener('click', () => toast.remove());
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function estimatePlantsFromPatchSize(patchSize) {
+      if (!patchSize) return 1;
+      if (patchSize.includes('50+')) return 60;
+      if (patchSize.includes('21–50')) return 35;
+      if (patchSize.includes('6–20')) return 12;
+      return 3;
+    }
+
+    function updateConnectionBadges(isConnected, errorMsg = '') {
+      const headerBadge = document.getElementById('header-sync-badge');
+      if (!headerBadge) return;
+
+      if (isConnected) {
+        headerBadge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-meadow-100 text-meadow-800 border border-meadow-200';
+        headerBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Realtime Database Live`;
+      } else {
+        headerBadge.className = 'hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amberleaf-100 text-amberleaf-800 border border-amberleaf-200';
+        headerBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amberleaf-500"></span>Database Error`;
+      }
+      if (errorMsg) console.error('Realtime Database status:', errorMsg);
+    }
+
+    // =========================================================================
+    // 3. THE WEBSITE'S OWN INTERACTIVE LEAFLET MAP
+    // =========================================================================
+    const leafletContainer = document.getElementById('leaflet-map');
+    const mapLegend = document.getElementById('map-legend');
+    const basemapSelect = document.getElementById('map-basemap-select');
+
+    function switchToInteractiveMap() {
+      leafletContainer.classList.remove('hidden');
+      mapLegend.classList.remove('hidden');
+      basemapSelect.classList.remove('hidden');
+      if (map) setTimeout(() => map.invalidateSize(), 50);
+    }
+
+    // =========================================================================
+    // 4. INTERACTIVE LEAFLET MAP (COORDINATE PICKER & LIVE PINS)
+    // =========================================================================
+    function initMap() {
+      const defaultCoords = [42.3318, -71.1212];
+
+      map = L.map('leaflet-map', {
+        center: defaultCoords,
+        zoom: 12,
+        zoomControl: true
+      });
+
+      tileLayers = {
+        osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }),
+        topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+          maxZoom: 17,
+          attribution: '&copy; OpenTopoMap (CC-BY-SA)'
+        }),
+        satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 18,
+          attribution: 'Tiles &copy; Esri'
+        })
+      };
+
+      currentTileLayer = tileLayers.osm;
+      currentTileLayer.addTo(map);
+      markersLayerGroup = L.layerGroup().addTo(map);
+
+      map.on('click', (e) => {
+        const lat = Number(e.latlng.lat.toFixed(6));
+        const lng = Number(e.latlng.lng.toFixed(6));
+        setDraftPin(lat, lng, true);
+      });
+    }
+
+    function createCustomMarkerIcon(isDraft = false) {
+      if (isDraft) {
+        return L.divIcon({
+          className: 'custom-pin',
+          html: `
+            <div class="relative flex items-center justify-center w-8 h-8">
+              <span class="absolute w-8 h-8 rounded-full bg-sky-400 pin-pulse"></span>
+              <div class="relative w-7 h-7 rounded-full bg-sky-500 border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold">
+                +
+              </div>
+            </div>
+          `,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+      }
+
+      return L.divIcon({
+        className: 'custom-pin',
+        html: `
+          <div class="w-8 h-8 rounded-full bg-meadow-600 border-2 border-white shadow-md flex items-center justify-center text-sm">
+            🌿
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -16]
+      });
+    }
+
+    function setDraftPin(lat, lng, showNotice = false) {
+      document.getElementById('input-lat').value = lat;
+      document.getElementById('input-lng').value = lng;
+
+      if (draftMarker) {
+        draftMarker.setLatLng([lat, lng]);
+      } else {
+        draftMarker = L.marker([lat, lng], {
+          icon: createCustomMarkerIcon(true),
+          draggable: true
+        }).addTo(map);
+
+        draftMarker.on('dragend', (event) => {
+          const pos = event.target.getLatLng();
+          document.getElementById('input-lat').value = Number(pos.lat.toFixed(6));
+          document.getElementById('input-lng').value = Number(pos.lng.toFixed(6));
+        });
+      }
+
+      if (showNotice) {
+        showToast(`Pin placed at ${lat}, ${lng}. Complete the form to save!`, 'info');
+      }
+    }
+
+    basemapSelect.addEventListener('change', (e) => {
+      const selected = e.target.value;
+      if (tileLayers[selected]) {
+        map.removeLayer(currentTileLayer);
+        currentTileLayer = tileLayers[selected];
+        currentTileLayer.addTo(map);
+      }
+    });
+
+    ['input-lat', 'input-lng'].forEach((id) => {
+      document.getElementById(id).addEventListener('change', () => {
+        const lat = parseFloat(document.getElementById('input-lat').value);
+        const lng = parseFloat(document.getElementById('input-lng').value);
+        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          setDraftPin(lat, lng, false);
+          map.panTo([lat, lng]);
+        }
+      });
+    });
+
+    // GPS Geolocation button
+    document.getElementById('btn-locate-me').addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        showToast('Geolocation is not supported by your browser.', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-locate-me');
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Locating...</span>`;
+      lucide.createIcons();
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = Number(pos.coords.latitude.toFixed(6));
+          const lng = Number(pos.coords.longitude.toFixed(6));
+          map.setView([lat, lng], 15);
+          setDraftPin(lat, lng, true);
+          btn.disabled = false;
+          btn.innerHTML = `<i data-lucide="crosshair" class="w-3.5 h-3.5"></i><span>Use My GPS</span>`;
+          lucide.createIcons();
+        },
+        (err) => {
+          showToast(`Unable to get GPS location: ${err.message}`, 'error');
+          btn.disabled = false;
+          btn.innerHTML = `<i data-lucide="crosshair" class="w-3.5 h-3.5"></i><span>Use My GPS</span>`;
+          lucide.createIcons();
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+
+    // =========================================================================
+    // 5. OPTIONAL PHOTO UPLOAD (CANVAS COMPRESSION) & URL PREVIEW
+    // =========================================================================
+    const photoFileInput = document.getElementById('input-photo-file');
+    const photoUrlInput = document.getElementById('input-photo-url');
+    const photoPreviewWrapper = document.getElementById('photo-preview-wrapper');
+    const photoPreviewImg = document.getElementById('photo-preview-img');
+    const btnRemovePhoto = document.getElementById('btn-remove-photo');
+
+    function setFormPhotoPreview(src) {
+      if (!src) {
+        currentPhotoDataUrl = '';
+        photoPreviewImg.src = '';
+        photoPreviewWrapper.classList.add('hidden');
+        btnRemovePhoto.classList.add('hidden');
+        return;
+      }
+      currentPhotoDataUrl = src;
+      photoPreviewImg.src = src;
+      photoPreviewWrapper.classList.remove('hidden');
+      btnRemovePhoto.classList.remove('hidden');
+    }
+
+    function compressImageToDataUrl(file, maxWidth = 800, quality = 0.72) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Failed to read image file'));
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('Invalid image format'));
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    photoFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const compressed = await compressImageToDataUrl(file, 800, 0.72);
+        photoUrlInput.value = '';
+        setFormPhotoPreview(compressed);
+        showToast('Photo attached and optimized for cloud storage!');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+
+    photoUrlInput.addEventListener('input', () => {
+      const urlVal = photoUrlInput.value.trim();
+      if (urlVal) {
+        photoFileInput.value = '';
+        setFormPhotoPreview(urlVal);
+      } else if (!currentPhotoDataUrl.startsWith('data:')) {
+        setFormPhotoPreview('');
+      }
+    });
+
+    btnRemovePhoto.addEventListener('click', () => {
+      photoFileInput.value = '';
+      photoUrlInput.value = '';
+      setFormPhotoPreview('');
+    });
+
+    // =========================================================================
+    // 6. RENDERING MAP MARKERS, FILTERED LIST & SUMMARY STATS
+    // =========================================================================
+    function getFilteredSightings() {
+      const searchTerm = document.getElementById('filter-search').value.trim().toLowerCase();
+      const speciesFilter = document.getElementById('filter-species').value;
+      const photoOnly = document.getElementById('filter-photo-only').checked;
+
+      return allSightings.filter((item) => {
+        if (photoOnly && !item.photoUrl) return false;
+        if (speciesFilter !== 'ALL' && item.species !== speciesFilter) return false;
+        if (searchTerm) {
+          const haystack = `${item.locationName || ''} ${item.species || ''} ${item.notes || ''}`.toLowerCase();
+          if (!haystack.includes(searchTerm)) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderAll() {
+      const totalPatches = allSightings.length;
+      const totalEstimatedPlants = allSightings.reduce((acc, s) => acc + estimatePlantsFromPatchSize(s.patchSize), 0);
+
+      document.getElementById('stat-total-patches').textContent = totalPatches;
+      document.getElementById('stat-total-plants').textContent = `${totalEstimatedPlants}+`;
+      document.getElementById('mobile-stat-patches').textContent = totalPatches;
+      document.getElementById('mobile-stat-plants').textContent = `${totalEstimatedPlants}+`;
+
+      const filtered = getFilteredSightings();
+      document.getElementById('filtered-count-badge').textContent = filtered.length;
+
+      renderMapMarkers(filtered);
+      renderSightingsList(filtered);
+    }
+
+    function renderMapMarkers(sightings) {
+      if (!markersLayerGroup) return;
+      markersLayerGroup.clearLayers();
+
+      sightings.forEach((s) => {
+        if (typeof s.lat !== 'number' || typeof s.lng !== 'number') return;
+
+        const marker = L.marker([s.lat, s.lng], {
+          icon: createCustomMarkerIcon(false)
+        });
+
+        const popupHtml = `
+          <div class="min-w-[210px] max-w-[260px]">
+            ${s.photoUrl ? `<img src="${escapeHtml(s.photoUrl)}" alt="${escapeHtml(s.species)}" class="w-full h-28 object-cover rounded-lg mb-2 border border-slate-200" onerror="this.style.display='none'" />` : ''}
+            <div class="flex items-center justify-between gap-2 mb-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-meadow-100 text-meadow-800">
+                🌿 Milkweed Patch
+              </span>
+              <span class="text-[11px] text-slate-400">${escapeHtml(s.dateFound || '')}</span>
+            </div>
+            <h4 class="font-bold text-sm text-slate-900 mb-0.5">${escapeHtml(s.locationName)}</h4>
+            <p class="text-xs font-semibold text-meadow-700">${escapeHtml(s.species)}</p>
+            <p class="text-xs text-slate-600 mt-1"><strong>Patch Size:</strong> ${escapeHtml(s.patchSize)}</p>
+            ${s.notes ? `<p class="text-xs text-slate-600 mt-1 italic bg-slate-50 p-1.5 rounded-lg border border-slate-100">"${escapeHtml(s.notes)}"</p>` : ''}
+            <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+              <span>${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}</span>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(popupHtml);
+        markersLayerGroup.addLayer(marker);
+      });
+    }
+
+    function renderSightingsList(sightings) {
+      const listEl = document.getElementById('sightings-list');
+
+      if (sightings.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-center py-8 px-4 bg-meadow-50/50 rounded-xl border border-dashed border-meadow-200">
+            <p class="text-sm font-semibold text-slate-700">No milkweed patches match your filter</p>
+            <p class="text-xs text-slate-500 mt-1">Use the form above to log a milkweed location!</p>
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = sightings.map((s) => {
+        return `
+          <div class="p-3 rounded-xl border border-slate-200 bg-white hover:border-meadow-400 transition group">
+            <div class="flex items-start gap-3">
+              ${s.photoUrl ? `
+                <button type="button" data-action="view-photo" data-id="${s.id}" class="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100 hover:opacity-90 transition">
+                  <img src="${escapeHtml(s.photoUrl)}" alt="${escapeHtml(s.species)}" class="w-full h-full object-cover" onerror="this.parentElement.style.display='none'" />
+                </button>
+              ` : ''}
+
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-1.5 mb-1">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-meadow-100 text-meadow-800">
+                    🌿 ${escapeHtml(s.species)}
+                  </span>
+                  <span class="text-[11px] text-slate-400">&bull; ${escapeHtml(s.dateFound || '')}</span>
+                </div>
+
+                <h3 class="font-semibold text-sm text-slate-900 truncate">${escapeHtml(s.locationName)}</h3>
+                <p class="text-xs text-slate-600 mt-0.5">${escapeHtml(s.patchSize)}</p>
+                ${s.notes ? `<p class="text-xs text-slate-500 mt-1 line-clamp-2">${escapeHtml(s.notes)}</p>` : ''}
+              </div>
+
+              <div class="flex flex-col items-end gap-1.5 shrink-0">
+                <button type="button" data-action="fly" data-lat="${s.lat}" data-lng="${s.lng}" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-meadow-100 text-meadow-800 hover:bg-meadow-200 transition">
+                  Locate
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Event delegation for Sightings List actions (Locate and View Photo)
+    document.getElementById('sightings-list').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+
+      const action = btn.dataset.action;
+      if (action === 'fly') {
+        const lat = parseFloat(btn.dataset.lat);
+        const lng = parseFloat(btn.dataset.lng);
+        switchToInteractiveMap();
+        map.setView([lat, lng], 16);
+      } else if (action === 'view-photo') {
+        const item = allSightings.find((s) => s.id === btn.dataset.id);
+        if (item && item.photoUrl) {
+          document.getElementById('modal-photo-img').src = item.photoUrl;
+          document.getElementById('modal-photo-species').textContent = item.species || 'Milkweed';
+          document.getElementById('modal-photo-date').textContent = item.dateFound || '';
+          document.getElementById('modal-photo-title').textContent = item.locationName || '';
+          document.getElementById('modal-photo-size').textContent = `Patch Size: ${item.patchSize || ''}`;
+          const notesEl = document.getElementById('modal-photo-notes');
+          if (item.notes) {
+            notesEl.textContent = item.notes;
+            notesEl.classList.remove('hidden');
+          } else {
+            notesEl.classList.add('hidden');
+          }
+          document.getElementById('photo-modal').classList.remove('hidden');
+        }
+      }
+    });
+
+    document.getElementById('btn-close-photo-modal').addEventListener('click', () => {
+      document.getElementById('photo-modal').classList.add('hidden');
+    });
+
+    // Filter listeners
+    document.getElementById('filter-search').addEventListener('input', renderAll);
+    document.getElementById('filter-species').addEventListener('change', renderAll);
+    document.getElementById('filter-photo-only').addEventListener('change', renderAll);
+
+    // =========================================================================
+    // 7. PUBLIC SIGHTING SUBMISSION (REALTIME DATABASE)
+    // =========================================================================
+    function resetForm() {
+      document.getElementById('sighting-form').reset();
+      document.getElementById('input-date').value = todayStr;
+      setFormPhotoPreview('');
+      document.getElementById('form-heading').textContent = 'Log a Milkweed Sighting';
+      document.getElementById('form-subheading').textContent = 'Use GPS, type coordinates, or click the Coordinate Picker map';
+      document.getElementById('btn-submit-text').textContent = 'Save Milkweed Sighting';
+
+      if (draftMarker) {
+        map.removeLayer(draftMarker);
+        draftMarker = null;
+      }
+    }
+
+
+    document.getElementById('sighting-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!db) {
+        showToast('The shared database is not connected. Please try again later.', 'error');
+        return;
+      }
+
+      const lat = parseFloat(document.getElementById('input-lat').value);
+      const lng = parseFloat(document.getElementById('input-lng').value);
+      const locationName = document.getElementById('input-location-name').value.trim();
+      const species = document.getElementById('input-species').value;
+      const patchSize = document.getElementById('input-patch-size').value;
+      const dateFound = document.getElementById('input-date').value;
+      const notes = document.getElementById('input-notes').value.trim();
+      const photoUrl = currentPhotoDataUrl || '';
+
+      if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        showToast('Please enter valid coordinates or use GPS / Coordinate Picker.', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('btn-submit-sighting');
+      submitBtn.disabled = true;
+
+      try {
+        const sightingsRef = ref(db, 'milkweed_sightings');
+
+        // Use the location name as the readable Firebase record key.
+        // Firebase keys cannot contain ., #, $, [, ], or /.
+        // A unique push ID is appended so two sightings with the same name
+        // are both saved instead of one overwriting the other.
+        const readableLocationKey = (locationName || 'Unnamed_Location')
+          .trim()
+          .replace(/[.#$\[\]/]/g, '_')
+          .replace(/\s+/g, '_')
+          .replace(/^_+|_+$/g, '') || 'Unnamed_Location';
+        const uniqueId = push(sightingsRef).key;
+        const newSightingRef = ref(db, `milkweed_sightings/${readableLocationKey}__${uniqueId}`);
+        await set(newSightingRef, {
+          lat,
+          lng,
+          locationName,
+          species,
+          patchSize,
+          dateFound,
+          photoUrl,
+          notes,
+          createdAt: serverTimestamp()
+        });
+        showToast('New milkweed patch saved to the shared map!');
+
+        resetForm();
+        map.setView([lat, lng], 14);
+      } catch (err) {
+        console.error('Error saving sighting:', err);
+        showToast(`Could not save sighting: ${err.message}`, 'error');
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    // =========================================================================
+    // 9. FIREBASE REALTIME DATABASE (NO AUTHENTICATION)
+    // =========================================================================
+    async function initFirebase() {
+      const requiredPlaceholders = [
+        'PASTE_YOUR_API_KEY_HERE',
+        'PASTE_YOUR_DATABASE_URL_HERE',
+        'PASTE_YOUR_PROJECT_ID_HERE',
+        'PASTE_YOUR_STORAGE_BUCKET_HERE',
+        'PASTE_YOUR_MESSAGING_SENDER_ID_HERE',
+        'PASTE_YOUR_APP_ID_HERE'
+      ];
+      const configText = JSON.stringify(CUSTOM_FIREBASE_CONFIG);
+      if (requiredPlaceholders.some(value => configText.includes(value))) {
+        updateConnectionBadges(false, 'Firebase config placeholders have not been replaced');
+        document.getElementById('sightings-list').innerHTML = `
+          <div class="p-4 rounded-xl bg-amberleaf-50 border border-amberleaf-200 text-xs text-amberleaf-900 space-y-2">
+            <p class="font-bold">Firebase configuration is incomplete</p>
+            <p>The website owner needs to paste the Firebase web config, including the Realtime Database URL, into this file.</p>
+          </div>
+        `;
+        return;
+      }
+
+      try {
+        app = initializeApp(CUSTOM_FIREBASE_CONFIG);
+        db = getDatabase(app);
+        updateConnectionBadges(true);
+        subscribeToSightings();
+      } catch (error) {
+        console.error('Firebase initialization error:', error);
+        updateConnectionBadges(false, error.message);
+        showToast(`Firebase connection error: ${error.message}`, 'error');
+        document.getElementById('sightings-list').innerHTML = `
+          <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 space-y-1.5">
+            <p class="font-bold">Unable to connect to Firebase:</p>
+            <p>${escapeHtml(error.message)}</p>
+            <p class="text-slate-600 pt-1">Check that Realtime Database is created and the Firebase config is correct.</p>
+          </div>
+        `;
+      }
+    }
+
+    function subscribeToSightings() {
+      if (!db) return;
+      const sightingsRef = ref(db, 'milkweed_sightings');
+      onValue(
+        sightingsRef,
+        (snapshot) => {
+          const data = snapshot.val() || {};
+          const items = Object.entries(data).map(([id, value]) => ({ id, ...value }));
+          items.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+          allSightings = items;
+          renderAll();
+        },
+        (error) => {
+          console.error('Realtime Database listener error:', error);
+          updateConnectionBadges(false, error.message);
+          showToast(`Realtime Database sync error: ${error.message}`, 'error');
+        }
+      );
+    }
+
+    // Boot application
+    window.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      switchToInteractiveMap();
+      setTimeout(() => map.invalidateSize(), 100);
+      initFirebase();
+    });
+  </script>
+</body>
+</html>
